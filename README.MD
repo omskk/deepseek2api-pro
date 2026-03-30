@@ -1,8 +1,8 @@
 # DeepSeek2API
 
-[![](https://img.shields.io/github/license/iidamie/deepseek2api.svg)](LICENSE)
-![](https://img.shields.io/github/stars/iidamie/deepseek2api.svg)
-![](https://img.shields.io/github/forks/iidamie/deepseek2api.svg)
+[![](https://img.shields.io/github/license/omskk/deepseek2api.svg)](LICENSE)
+![](https://img.shields.io/github/stars/omskk/deepseek2api.svg)
+![](https://img.shields.io/github/forks/omskk/deepseek2api.svg)
 
 ## 免责声明
 
@@ -19,7 +19,7 @@
 ### 1. 克隆项目
 
 ```shell
-git clone https://github.com/iidamie/deepseek2api.git
+git clone https://github.com/omskk/deepseek2api.git
 cd deepseek2api
 ```
 
@@ -73,7 +73,7 @@ docker run -d -p 5001:5001 \
   -e API_KEYS="key1,key2" \
   -e ACCOUNTS='[{"email":"example1@example.com","password":"password1","token":""}]' \
   --name deepseek2api \
-  ghcr.io/iidamie/deepseek2api:latest
+  ghcr.io/omskk/deepseek2api:latest
 ```
 
 ### 使用 Docker Compose
@@ -90,4 +90,4 @@ docker-compose up -d
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=iidamie/deepseek2api&type=Date)](https://star-history.com/#omskk/deepseek2api-pro&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=omskk/deepseek2api&type=Date)](https://star-history.com/#omskk/deepseek2api-pro&Date)
