@@ -2,6 +2,7 @@ import base64
 import ctypes
 import json
 import logging
+import os
 import queue
 import random
 import re
@@ -10,11 +11,15 @@ import threading
 import time
 import transformers
 from curl_cffi import requests
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from wasmtime import Linker, Module, Store
+
+# 加载环境变量
+load_dotenv()
 
 # -------------------------- 初始化 tokenizer --------------------------
 chat_tokenizer_dir = "./"
@@ -45,26 +50,87 @@ templates = Jinja2Templates(directory="templates")
 # ----------------------------------------------------------------------
 # (1) 配置文件的读写函数
 # ----------------------------------------------------------------------
-CONFIG_PATH = "config.json"
+TOKENS_PATH = "tokens.json"  # 用于存储动态 token
 
 
 def load_config():
-    """从 config.json 加载配置，出错则返回空 dict"""
+    """从环境变量加载配置，出错则返回空 dict"""
+    config = {}
+    
+    # 从环境变量 API_KEYS 加载 keys
+    api_keys_str = os.getenv("API_KEYS", "")
+    if api_keys_str:
+        config["keys"] = [k.strip() for k in api_keys_str.split(",") if k.strip()]
+    
+    # 从环境变量 ACCOUNTS 加载 accounts (JSON 格式)
+    accounts_str = os.getenv("ACCOUNTS", "")
+    if accounts_str:
+        try:
+            config["accounts"] = json.loads(accounts_str)
+        except Exception as e:
+            logger.warning(f"[load_config] 解析 ACCOUNTS 环境变量失败：{e}")
+            config["accounts"] = []
+    
+    # 从环境变量 CLAUDE_MODEL_MAPPING 加载模型映射 (JSON 格式)
+    claude_mapping_str = os.getenv("CLAUDE_MODEL_MAPPING", "")
+    if claude_mapping_str:
+        try:
+            config["claude_model_mapping"] = json.loads(claude_mapping_str)
+        except Exception as e:
+            logger.warning(f"[load_config] 解析 CLAUDE_MODEL_MAPPING 环境变量失败：{e}")
+            config["claude_model_mapping"] = {"fast": "deepseek-chat", "slow": "deepseek-chat"}
+    
+    # 加载保存的 token
+    load_tokens_to_accounts(config)
+    
+    return config
+
+
+def load_tokens_to_accounts(config):
+    """从 tokens.json 加载 token 并更新到 accounts"""
     try:
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+        with open(TOKENS_PATH, "r", encoding="utf-8") as f:
+            tokens_data = json.load(f)
+        
+        # 根据账号标识匹配并更新 token
+        tokens_map = {}
+        for item in tokens_data.get("tokens", []):
+            identifier = item.get("identifier", "")
+            if identifier:
+                tokens_map[identifier] = item.get("token", "")
+        
+        # 更新 accounts 中的 token
+        for account in config.get("accounts", []):
+            identifier = get_account_identifier(account)
+            if identifier and identifier in tokens_map:
+                account["token"] = tokens_map[identifier]
+    except FileNotFoundError:
+        pass  # tokens.json 不存在，使用空 token
     except Exception as e:
-        logger.warning(f"[load_config] 无法读取配置文件: {e}")
-        return {}
+        logger.warning(f"[load_tokens_to_accounts] 加载 token 失败：{e}")
+
+
+def save_tokens():
+    """保存 accounts 中的 token 到 tokens.json"""
+    try:
+        tokens_data = {"tokens": []}
+        for account in CONFIG.get("accounts", []):
+            identifier = get_account_identifier(account)
+            if identifier:
+                tokens_data["tokens"].append({
+                    "identifier": identifier,
+                    "token": account.get("token", "")
+                })
+        
+        with open(TOKENS_PATH, "w", encoding="utf-8") as f:
+            json.dump(tokens_data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"[save_tokens] 保存 token 失败：{e}")
 
 
 def save_config(cfg):
-    """将配置写回 config.json"""
-    try:
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.error(f"[save_config] 写入 config.json 失败: {e}")
+    """保存 token 到 tokens.json"""
+    save_tokens()
 
 
 CONFIG = load_config()
